@@ -11,19 +11,20 @@ import pandas as pd
 import numpy as np
 import warnings
 import optuna
+from optuna.samplers import TPESampler
 from catboost import CatBoostClassifier
 from sklearn.metrics import f1_score
 import random
 import os
 
 warnings.filterwarnings('ignore')
-
+SEED = 41
 def set_seed(seed=42):
     random.seed(seed)
     np.random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
 
-set_seed(42)
+set_seed(SEED)
 
 STATIONS = ['DKI1', 'DKI2', 'DKI3', 'DKI4', 'DKI5']
 LAG_DAYS = [1, 2, 7, 30]
@@ -127,8 +128,8 @@ def main():
         s17 = calculate_f1(v17) if not v17.empty else s24
         return 0.7 * s24 + 0.3 * s17
 
-    study = optuna.create_study(direction='maximize')
-    study.optimize(objective, n_trials=200)
+    study = optuna.create_study(direction='maximize', sampler=TPESampler(seed=SEED))
+    study.optimize(objective, n_trials=100)
     bm = study.best_params
     print(f"Optimal Magic Numbers: {bm}")
 
@@ -175,6 +176,8 @@ def main():
     
     pf = (model.predict_proba(f_a[features].fillna(-1)) + model.predict_proba(f_b[features].fillna(-1))) / 2.0
     f_a['p0'], f_a['p2'] = pf[:, 0], pf[:, 2]
+    f_a['id'] = f_a['tanggal'].dt.strftime('%Y-%m-%d') + '_' + f_a['stasiun']
+    f_a[['id', 'stasiun', 'tanggal', 'p0', 'p2']].to_csv('probs_v900_magic.csv', index=False)
     
     final = []
     for st in STATIONS:
@@ -206,3 +209,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
